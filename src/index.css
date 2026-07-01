@@ -1,0 +1,211 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Lato", sans-serif;
+  --font-lato: "Lato", sans-serif;
+  --font-noto: "Noto Sans", sans-serif;
+  --color-brand-green: #075618;
+  --color-brand-orange: #F29222;
+  --color-brand-black: #111111;
+  --color-brand-gray: #E8E7E7;
+  --color-brand-light-bg: #f8fafc;
+  --color-lab-cyan: #06b6d4;
+  --color-lab-blue: #2563eb;
+  --color-lab-red: #ef4444;
+
+  --tracking-tighter: -0.015em;
+  --tracking-tight: -0.01em;
+  --tracking-wide: 0.0125em;
+  --tracking-wider: 0.025em;
+  --tracking-widest: 0.05em;
+}
+
+@layer base {
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: var(--font-display) !important;
+  }
+
+  h1, h2 {
+    font-weight: 800;
+    letter-spacing: -0.01em; /* -0.01em ou 0 */
+  }
+
+  :root h1, :root h2 {
+    color: #111111 !important;
+  }
+
+  .dark h1, .dark h2 {
+    color: #f8fafc !important;
+  }
+
+  label {
+    font-family: var(--font-sans) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important; /* Evita letter-spacing muito alto */
+  }
+
+  input, select, textarea, option {
+    font-family: var(--font-sans) !important;
+    font-weight: 600 !important; /* Mantém 600 ou 700 */
+  }
+
+  :root input, :root select, :root textarea, :root option {
+    color: #111111 !important;
+  }
+
+  .dark input, .dark select, .dark textarea, .dark option {
+    color: #f8fafc !important;
+  }
+
+  /* =============================================
+     MODO CLARO — fundo branco, verde e laranja
+     ============================================= */
+  :root {
+    /* Fundos */
+    --bg-main: #f8fafc;
+    --bg-content: #f1f5f9;
+    --bg-sidebar: #ffffff;
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --bg-card-page: #ffffff;
+
+    /* Bordas */
+    --border-lab: rgba(0, 0, 0, 0.07);
+    --border-page: #03440c;
+
+    /* Textos */
+    --text-main: #334155;
+    --text-muted: #64748b;
+    --text-bright: #0f172a;
+
+    /* Utilitários */
+    --logo-filter: none;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  }
+
+  /* =============================================
+     MODO ESCURO — fundo azul-slate, verde néon
+     ============================================= */
+  .dark {
+    /* Fundos */
+    --bg-main: #020617;
+    --bg-content: #020617;
+    --bg-sidebar: rgba(15, 23, 42, 0.85);
+    --bg-card: rgba(30, 41, 59, 0.5);
+    --bg-card-page: #060b13;
+
+    /* Bordas */
+    --border-lab: rgba(255, 255, 255, 0.06);
+    --border-page: #059669;
+
+    /* Textos */
+    --text-main: #94a3b8;
+    --text-muted: #64748b;
+    --text-bright: #f8fafc;
+
+    /* Utilitários */
+    --logo-filter: brightness(0) invert(1);
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+  }
+
+  body {
+    @apply transition-colors duration-300 antialiased;
+    font-family: var(--font-sans);
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  /* Garante que sidebar use sempre a variável correta por modo */
+  aside {
+    background-color: var(--bg-sidebar);
+  }
+
+  .lab-bg-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10h1v1h-1zM50 50h1v1h-1zM90 90h1v1h-1zM30 70h1v1h-1zM70 20h1v1h-1z' fill='%2300d136' fill-opacity='0.03'/%3E%3Ccircle cx='25' cy='25' r='1' fill='%2300d136' fill-opacity='0.02'/%3E%3Ccircle cx='75' cy='75' r='1' fill='%2300d136' fill-opacity='0.02'/%3E%3Cpath d='M15 85l2 2m0-2l-2 2' stroke='%2300d136' stroke-opacity='0.02' stroke-width='0.5'/%3E%3Cpath d='M85 15l2 2m0-2l-2 2' stroke='%2300d136' stroke-opacity='0.02' stroke-width='0.5'/%3E%3Crect x='45' y='15' width='4' height='4' rx='1' stroke='%2300d136' stroke-opacity='0.02' stroke-width='0.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+  }
+
+  .glass {
+    @apply backdrop-blur-md;
+    background: var(--bg-card);
+    border: 1px solid var(--border-lab);
+  }
+}
+
+.dark .glow-green {
+  box-shadow: 0 0 15px rgba(46, 204, 113, 0.1);
+}
+
+.dark .glow-cyan {
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.15);
+}
+
+.dark .text-glow-green {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-lab);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
+}
+
+/* Force high contrast and brand styling for select options across all browsers and modes */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="tel"],
+input[type="number"],
+select {
+  color: var(--text-bright) !important;
+}
+
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="url"],
+.dark input[type="tel"],
+.dark input[type="number"],
+.dark select {
+  color: #ffffff !important;
+}
+
+select option {
+  background-color: #ffffff !important; /* Modo claro: fundo branco */
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+.dark select option,
+.dark option {
+  background-color: #022c22 !important; /* Modo escuro: verde escuro */
+  color: #f8fafc !important;
+}
+
+/* Inventory filter — no modo claro texto escuro, no escuro branco */
+.inventory-filter-select,
+input[type="text"].inventory-search-input,
+.inventory-search-input {
+  color: var(--text-bright) !important;
+}
