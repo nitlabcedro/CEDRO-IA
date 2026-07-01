@@ -25,6 +25,7 @@ import { UserProfileView } from "./components/UserProfileView";
 import { Chat } from "./components/Chat";
 import { useAuth } from "./contexts/AuthContext";
 import ApprovalPage from "./components/ApprovalPage";
+import ResetPassword from "./components/ResetPassword";
 import { generateSystemAlerts, saveAlertInteraction } from "./lib/alerts";
 import { Eye, CheckCircle, AlertCircle, Info, Check } from "lucide-react";
 
@@ -530,6 +531,58 @@ export default function App() {
       console.error("Erro ao excluir:", error);
       setRecords(previousRecords);
       alert("Houve um erro ao excluir o registro. Por favor, tente novamente.");
+    }
+  };
+
+  const handleCancelRequest = async (recordId: string) => {
+    try {
+      const record = records.find(r => r.id === recordId);
+      if (!record) return;
+
+      const updatedRecord: IARecord = {
+        ...record,
+        statusUso: StatusUso.CANCELADA,
+        updatedAt: new Date().toISOString(),
+        historico: [
+          ...(record.historico || []),
+          {
+            date: new Date().toISOString(),
+            action: "Solicitação cancelada pelo solicitante",
+            user: profile?.full_name || user?.email || "Solicitante",
+            message: "A solicitação foi cancelada diretamente pelo solicitante através do inventário."
+          }
+        ]
+      };
+
+      // Update ia_records via updateRecord
+      await updateRecord(updatedRecord, user?.id, isCurrentUserAdmin);
+
+      // Try updating approval workflow in Supabase
+      try {
+        const { data: wf } = await supabase
+          .from("approval_workflows")
+          .select("id")
+          .eq("ia_record_id", recordId)
+          .maybeSingle();
+
+        if (wf) {
+          await supabase
+            .from("approval_workflows")
+            .update({
+              final_status: "cancelado",
+              completed_at: new Date().toISOString()
+            })
+            .eq("id", wf.id);
+        }
+      } catch (wfErr) {
+        console.warn("Aviso ao tentar atualizar final_status no approval_workflows:", wfErr);
+      }
+
+      await Promise.all([refreshRecords(), loadApprovalData()]);
+      alert("Solicitação cancelada com sucesso.");
+    } catch (error) {
+      console.error("Erro ao cancelar solicitação:", error);
+      alert("Houve um erro ao cancelar a solicitação. Por favor, tente novamente.");
     }
   };
 
@@ -1270,6 +1323,16 @@ export default function App() {
 
 
 
+  const isResetPasswordPage = window.location.pathname === "/reset-password";
+
+  if (isResetPasswordPage) {
+    return (
+      <div className={isDarkMode ? "dark" : ""}>
+        <ResetPassword />
+      </div>
+    );
+  }
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-main)]">
@@ -1419,6 +1482,9 @@ export default function App() {
                   onRefresh={refreshRecords} approvalConfig={approvalConfig} onSaveApprovalConfig={handleSaveApprovalConfig}
                   isAdmin={isCurrentUserAdmin}
                   workflows={workflows}
+                  currentUser={user}
+                  currentUserProfile={profile}
+                  onCancelRequest={handleCancelRequest}
                 />
               )}
               {activeTab === "sectors" && isCurrentUserAdmin && (
@@ -1487,57 +1553,24 @@ export default function App() {
                     approvalConfig={approvalConfig}
                   />
                 ) : (
-                  <div className="space-y-8 pb-20">
-                    <div className="glass p-12 rounded-[2.5rem] border border-[var(--border-lab)] relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-lab-blue/5 blur-3xl rounded-full pointer-events-none"></div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {records.map(record => (
-                            <button
-                              key={record.id}
-                              onClick={() => setSelectedRecord(record)}
-                              className="group flex flex-col p-6 bg-white/[0.02] border border-brand-green/20 rounded-3xl hover:bg-black/5 dark:hover:bg-white/5 hover:border-brand-green/50 transition-all text-left relative overflow-hidden shadow-lg shadow-brand-green/5"
-                            >
-                            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-lab-cyan/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-                            <div className="flex justify-between items-start mb-6">
-                              <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-brand-green bg-brand-green/20 px-2 py-1 rounded border border-brand-green/40 uppercase tracking-tight">{record.id}</span>
-                              <div className="p-1.5 rounded-lg bg-black/5 dark:bg-white/5 text-slate-500 group-hover:text-lab-cyan group-hover:bg-lab-cyan/10 transition-all border border-transparent group-hover:border-lab-cyan/20">
-                                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                              </div>
-                            </div>
-                            <h4 className="font-bold text-[var(--text-bright)] text-lg tracking-tight mb-1 group-hover:text-lab-cyan transition-colors uppercase truncate">{record.nomeFerramenta}</h4>
-                            <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-tight truncate w-full flex items-center gap-2">
-                              <Users size={12} className="opacity-50" /> {record.unidadeSetor}
-                            </p>
-                            
-                            <div className="mt-8 pt-6 border-t border-[var(--border-lab)] flex justify-between items-center">
-                              <div className={`px-3 py-1 rounded-full border text-[10px] font-bold uppercase flex items-center gap-1.5 ${
-                                record.statusUso === StatusUso.APROVADO 
-                                  ? "bg-brand-green/10 text-brand-green border-brand-green/20" 
-                                  : "bg-brand-orange/10 text-brand-orange border-brand-orange/20"
-                              }`}>
-                                <div className={`size-1.5 rounded-full ${record.statusUso === StatusUso.APROVADO ? "bg-brand-green" : "bg-brand-orange"}`}></div>
-                                {record.statusUso}
-                              </div>
-                              <span className="text-[10px] font-mono text-[var(--text-muted)]">{record.dataRegistro}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-
-                      {records.length === 0 && (
-                        <div className="py-32 text-center space-y-6">
-                          <div className="inline-block p-6 bg-black/5 dark:bg-white/[0.02] rounded-full border border-[var(--border-lab)] relative">
-                            <div className="absolute inset-0 bg-brand-green/5 blur-xl rounded-full"></div>
-                            <ClipboardList className="text-[var(--text-muted)] relative z-10" size={40} />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[var(--text-muted)] font-bold text-base uppercase tracking-wide">Nenhum dado encontrado para auditoria</p>
-                            <p className="text-sm text-[var(--text-muted)]">Aguardando novos registros para gerar relatórios de conformidade.</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <Inventory 
+                    records={records} 
+                    onEdit={handleEdit} 
+                    onView={handleView} 
+                    onDelete={handleDelete}
+                    onAdd={() => {
+                      setSelectedRecord(null);
+                      setActiveTab("new");
+                    }}
+                    onRefresh={refreshRecords}
+                    approvalConfig={approvalConfig}
+                    onSaveApprovalConfig={handleSaveApprovalConfig}
+                    isAdmin={isCurrentUserAdmin}
+                    workflows={workflows}
+                    currentUser={user}
+                    currentUserProfile={profile}
+                    onCancelRequest={handleCancelRequest}
+                  />
                 )
               )}
               {activeTab === "chat" && (
