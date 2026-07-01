@@ -21,9 +21,25 @@ interface InventoryProps {
   approvalConfig?: any;
   onSaveApprovalConfig?: any;
   workflows?: ApprovalWorkflow[];
+  currentUser?: any;
+  currentUserProfile?: any;
+  onCancelRequest?: (id: string) => Promise<void>;
 }
 
-export default function Inventory({ records, onEdit, onView, onDelete, onAdd, onRefresh, isAdmin, approvalConfig, workflows }: InventoryProps) {
+export default function Inventory({ 
+  records, 
+  onEdit, 
+  onView, 
+  onDelete, 
+  onAdd, 
+  onRefresh, 
+  isAdmin, 
+  approvalConfig, 
+  workflows,
+  currentUser,
+  currentUserProfile,
+  onCancelRequest
+}: InventoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSetor, setFilterSetor] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -33,6 +49,70 @@ export default function Inventory({ records, onEdit, onView, onDelete, onAdd, on
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  
+  // Cancel State
+  const [cancelTargetRecord, setCancelTargetRecord] = useState<IARecord | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const isRequester = (record: IARecord) => {
+    if (!currentUser) return false;
+
+    // 1. Se existir ownerId (ou userId ou createdBy como fallback), comparar com currentUser.id
+    const recordOwnerId = record.ownerId || (record as any).userId || (record as any).createdBy;
+    if (recordOwnerId) {
+      return String(recordOwnerId) === String(currentUser.id);
+    }
+
+    // 2. Se não existir, comparar e-mail do usuário logado com o e-mail/contato da solicitação
+    const userEmail = currentUser.email?.toLowerCase().trim();
+    if (userEmail) {
+      const contatoLower = (record.contato || "").toLowerCase().trim();
+      const emailSolicitanteLower = (record as any).emailSolicitante?.toLowerCase().trim();
+      
+      if (contatoLower.includes(userEmail) || (emailSolicitanteLower && emailSolicitanteLower === userEmail)) {
+        return true;
+      }
+    }
+
+    // 3. Se não houver e-mail, comparar nome normalizado do perfil logado com responsavelPreenchimento, apenas como fallback
+    const userName = currentUserProfile?.full_name || "";
+    const respName = record.responsavelPreenchimento || "";
+    
+    if (userName && respName) {
+      const normalize = (str: string) => 
+        str.normalize("NFD")
+           .replace(/[\u0300-\u036f]/g, "")
+           .toLowerCase()
+           .replace(/[^a-z0-9]/g, "")
+           .trim();
+      return normalize(userName) === normalize(respName);
+    }
+
+    return false;
+  };
+
+  const canCancel = (record: IARecord) => {
+    // 1. O usuário logado for o responsável/solicitante da IA
+    const isOwner = isRequester(record);
+    const isUserAllowed = isOwner || isAdmin;
+
+    if (!isUserAllowed) return false;
+
+    // 2. A solicitação ainda não estiver finalizada e o status não for nenhum dos finais:
+    const statusLower = (record.statusUso || "").toLowerCase().trim();
+    const statusAuditoriaLower = (record.statusAuditoria || "").toLowerCase().trim();
+
+    const isFinalStatus = 
+      statusLower === "aprovado" || 
+      statusLower === "não aprovado" || 
+      statusLower === "negado" || 
+      statusLower === "cancelada" || 
+      statusLower === "cancelada pelo solicitante" ||
+      statusAuditoriaLower === "aprovado" ||
+      statusAuditoriaLower === "negado";
+
+    return !isFinalStatus;
+  };
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -242,6 +322,11 @@ export default function Inventory({ records, onEdit, onView, onDelete, onAdd, on
         bg: "bg-slate-100 text-slate-700",
         border: "border-slate-200",
         dot: "bg-slate-500",
+      },
+      [StatusUso.CANCELADA]: {
+        bg: "bg-[#F29222]/10 text-[#9A4F00]",
+        border: "border-[#F29222]/30",
+        dot: "bg-[#F29222]",
       },
     };
 
@@ -555,12 +640,24 @@ export default function Inventory({ records, onEdit, onView, onDelete, onAdd, on
                   <td className="pl-4 pr-6 py-4 text-right whitespace-nowrap">
                     {/* 5. Ações por linha */}
                     <div className="flex items-center justify-end gap-1.5">
+                      {canCancel(record) && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setCancelTargetRecord(record);
+                          }}
+                          className="inline-flex items-center justify-center rounded-xl border border-[#F29222]/30 bg-[#F29222]/10 px-3 py-2 text-xs font-bold text-[#9A4F00] transition-all hover:bg-[#F29222]/15 cursor-pointer"
+                        >
+                          Cancelar solicitação
+                        </button>
+                      )}
                       {(() => {
                         const recordWorkflow = workflows?.find(w => w.iaRecordId === record.id);
                         const isApprov = record.statusAuditoria === "Aprovado" || recordWorkflow?.finalStatus === "aprovado" || record.statusUso === StatusUso.APROVADO;
                         const isNeg = record.statusAuditoria === "Negado" || recordWorkflow?.finalStatus === "negado" || record.statusUso === StatusUso.NAO_APROVADO;
                         const isCompleted = isApprov || isNeg || record.statusUso === StatusUso.APROVADO_COM_RESTRICOES;
-                        const showWarning = !isAdmin && !isCompleted;
+                        const showWarning = false;
                         
                         return (
                           <button 
@@ -689,6 +786,53 @@ export default function Inventory({ records, onEdit, onView, onDelete, onAdd, on
                 className="px-4 py-1.5 bg-[#075618] hover:bg-[#054012] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
               >
                 Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel request confirmation modal */}
+      {cancelTargetRecord && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full border border-slate-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="flex items-center gap-3 text-[#9A4F00] mb-3">
+                <div className="p-2 bg-[#F29222]/10 rounded-lg">
+                  <AlertTriangle size={20} />
+                </div>
+                <h3 className="font-extrabold text-slate-800 text-base">
+                  Cancelar solicitação de IA?
+                </h3>
+              </div>
+              <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                Você está prestes a cancelar a solicitação para a ferramenta <strong className="text-slate-800 uppercase">{cancelTargetRecord.nomeFerramenta}</strong>.
+              </p>
+              <p className="text-slate-500 text-[11px] leading-relaxed">
+                Esta ação irá cancelar a solicitação e interromper o andamento do fluxo de aprovação. O registro permanecerá disponível para consulta no inventário e no histórico.
+              </p>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-100">
+              <button
+                onClick={() => setCancelTargetRecord(null)}
+                disabled={isCancelling}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={async () => {
+                  setIsCancelling(true);
+                  if (onCancelRequest) {
+                    await onCancelRequest(cancelTargetRecord.id);
+                  }
+                  setIsCancelling(false);
+                  setCancelTargetRecord(null);
+                }}
+                disabled={isCancelling}
+                className="px-4 py-2 bg-[#9A4F00] hover:bg-[#804200] disabled:bg-[#9A4F00]/50 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                {isCancelling ? "Cancelando..." : "Confirmar cancelamento"}
               </button>
             </div>
           </div>
