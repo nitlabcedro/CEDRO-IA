@@ -1074,33 +1074,61 @@ export default function RegistrationForm({ initialData, onSave, onCancel, isAdmi
 
       {/* Saving Loading View Overlay */}
       {isSaving && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-[6px] z-50 flex flex-col items-center justify-center p-6 transition-all duration-300">
-          <div className="bg-white p-8 rounded-3.5xl max-w-sm w-full border border-[#075618]/30 shadow-2xl flex flex-col items-center text-center space-y-6">
+        <div className="fixed inset-0 bg-slate-950/45 backdrop-blur-[6px] z-50 flex flex-col items-center justify-center p-6 transition-all duration-300 animate-in fade-in">
+          <div className="bg-white p-10 rounded-[2.5rem] border border-[#075618]/15 shadow-[0_25px_60px_-15px_rgba(7,86,24,0.15)] flex flex-col items-center text-center max-w-sm w-full space-y-6 relative overflow-hidden">
+            {/* Ambient background glow inside the popup */}
+            <div className="absolute -top-12 -left-12 w-24 h-24 bg-[#075618]/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-12 -right-12 w-24 h-24 bg-[#075618]/5 rounded-full blur-2xl pointer-events-none" />
+            
             <div className="relative flex items-center justify-center">
-              {/* Pulsing ring */}
-              <div className="absolute inset-0 size-20 rounded-full bg-[#075618]/15 animate-ping" />
-              {/* Spinning circle */}
-              <div className="size-16 rounded-full border-4 border-[#075618]/20 border-t-[#075618] animate-spin" />
-              {/* Save icon */}
-              <div className="absolute text-[#075618]">
-                <Save size={24} className="animate-pulse" />
+              {/* Outer light green background circle */}
+              <div className="size-24 rounded-full bg-[#075618]/5 flex items-center justify-center relative border border-[#075618]/10 shadow-inner">
+                {/* Inner white circle holding the save icon */}
+                <div className="size-18 rounded-full border border-[#075618]/10 flex items-center justify-center bg-white shadow-sm">
+                  <Save size={24} className="text-[#075618]" />
+                </div>
+                {/* SVG circular track with smooth animated spinner segment */}
+                <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100">
+                  <motion.circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    fill="transparent"
+                    stroke="#075618"
+                    strokeWidth="3.5"
+                    strokeDasharray="276.4"
+                    initial={{ strokeDashoffset: 276.4 }}
+                    animate={{ strokeDashoffset: [200, 50, 200], rotate: [0, 360] }}
+                    transition={{ 
+                      strokeDashoffset: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                      rotate: { repeat: Infinity, duration: 1.5, ease: "linear" }
+                    }}
+                    strokeLinecap="round"
+                  />
+                </svg>
               </div>
             </div>
             
-            <div className="space-y-2">
-              <h3 className="text-sm font-black uppercase tracking-tight text-[#111111] font-display">
+            <div className="space-y-1">
+              <h3 className="text-base font-black uppercase tracking-[0.12em] text-[#075618] font-sans">
                 Salvando Solicitação
               </h3>
-              <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed font-sans font-semibold">
-                {savingStep || "Sincronizando registros de IA..."}
-              </p>
             </div>
             
-            <div className="w-full bg-[#E8E7E7] h-1.5 rounded-full overflow-hidden">
-              <div className="bg-[#075618] h-full rounded-full animate-pulse" style={{ width: '85%' }} />
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden relative">
+              <motion.div 
+                className="bg-[#075618] h-full rounded-full"
+                initial={{ width: "10%", x: "0%" }}
+                animate={{ width: ["15%", "45%", "15%"], x: ["0%", "200%", "0%"] }}
+                transition={{ 
+                  repeat: Infinity, 
+                  duration: 2.2, 
+                  ease: "easeInOut" 
+                }}
+              />
             </div>
             
-            <span className="text-[9px] font-black uppercase tracking-widest text-[#075618] animate-pulse">
+            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#075618]/85 animate-pulse">
               Por favor, aguarde
             </span>
           </div>
