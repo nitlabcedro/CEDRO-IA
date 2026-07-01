@@ -160,6 +160,45 @@ create table if not exists ia_records (
   classificacao_risco text
 );
 
+-- 5. Tabela de Configuração de Aprovação (Workflow Config)
+create table if not exists approval_config (
+  step_number integer primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  role_name text not null,
+  assigned_user_id uuid references public.profiles(id) on delete set null,
+  assigned_user_name text,
+  is_opinion_only boolean default false,
+  updated_at timestamp with time zone,
+  updated_by uuid references public.profiles(id) on delete set null
+);
+
+-- 6. Tabela de Fluxos de Aprovação
+create table if not exists approval_workflows (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  ia_record_id text references public.ia_records(id) on delete cascade unique not null,
+  current_step integer default 1 not null,
+  final_status text default 'pendente' not null,
+  completed_at timestamp with time zone
+);
+
+-- 7. Tabela de Etapas de Aprovação
+create table if not exists approval_steps (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  workflow_id uuid references public.approval_workflows(id) on delete cascade not null,
+  ia_record_id text references public.ia_records(id) on delete cascade not null,
+  step_number integer not null,
+  role_name text not null,
+  assigned_user_id uuid references public.profiles(id) on delete set null,
+  assigned_user_name text,
+  status text default 'aguardando' not null,
+  comment text,
+  is_opinion_only boolean default false,
+  decided_at timestamp with time zone,
+  unique (workflow_id, step_number)
+);
+
 -- CONFIGURAÇÃO PARA UPLOAD DE FOTOS (STORAGE)
 -- 1. Vá em 'Storage' no painel do Supabase.
 -- 2. Crie um novo bucket chamado 'avatars'.
@@ -239,6 +278,38 @@ create policy "Permitir tudo público"
   on ia_records for all
   using (true)
   with check (true);
+
+-- Habilitar RLS para tabelas de Workflow
+alter table approval_config enable row level security;
+alter table approval_workflows enable row level security;
+alter table approval_steps enable row level security;
+
+-- Políticas para approval_config
+drop policy if exists "Permitir leitura para autenticados" on approval_config;
+create policy "Permitir leitura para autenticados"
+  on approval_config for select to authenticated using (true);
+
+drop policy if exists "Permitir escrita total para autenticados" on approval_config;
+create policy "Permitir escrita total para autenticados"
+  on approval_config for all to authenticated using (true) with check (true);
+
+-- Políticas para approval_workflows
+drop policy if exists "Permitir leitura para autenticados" on approval_workflows;
+create policy "Permitir leitura para autenticados"
+  on approval_workflows for select to authenticated using (true);
+
+drop policy if exists "Permitir escrita total para autenticados" on approval_workflows;
+create policy "Permitir escrita total para autenticados"
+  on approval_workflows for all to authenticated using (true) with check (true);
+
+-- Políticas para approval_steps
+drop policy if exists "Permitir leitura para autenticados" on approval_steps;
+create policy "Permitir leitura para autenticados"
+  on approval_steps for select to authenticated using (true);
+
+drop policy if exists "Permitir escrita total para autenticados" on approval_steps;
+create policy "Permitir escrita total para autenticados"
+  on approval_steps for all to authenticated using (true) with check (true);
 ```
 
 ## 2. Configurar Variáveis de Ambiente
