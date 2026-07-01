@@ -83,7 +83,8 @@ export enum StatusUso {
   APROVADO_COM_RESTRICOES = "Aprovado com restrições",
   NAO_APROVADO = "Não aprovado",
   SUSPENSO = "Suspenso",
-  EM_TESTE_PILOTO = "Em teste/piloto"
+  EM_TESTE_PILOTO = "Em teste/piloto",
+  CANCELADA = "Cancelada pelo solicitante"
 }
 
 export enum StatusAuditoria {
@@ -243,7 +244,7 @@ export interface ApprovalWorkflow {
   iaRecordId: string;
   currentStep: number;       // 1-5, 0 = concluído
   steps: ApprovalStep[];
-  finalStatus?: "aprovado" | "negado" | "pendente";
+  finalStatus?: "aprovado" | "negado" | "pendente" | "cancelado";
   completedAt?: string;
 }
 
