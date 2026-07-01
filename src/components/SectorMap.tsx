@@ -475,17 +475,17 @@ export default function SectorMap({ records, profiles }: SectorMapProps) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-[9px] font-bold text-slate-400 uppercase">Setor</p>
-                          <p className="text-xs font-bold text-slate-700 truncate">{selectedIA.unidadeSetor}</p>
+                          <p className="text-xs font-bold text-slate-700 truncate">{selectedIA.unidadeSetor || "Não preenchido"}</p>
                         </div>
                         <div>
                           <p className="text-[9px] font-bold text-slate-400 uppercase">Gestor da IA</p>
-                          <p className="text-xs font-bold text-slate-700 truncate">{selectedIA.responsavelPreenchimento}</p>
+                          <p className="text-xs font-bold text-slate-700 truncate">{selectedIA.responsavelPreenchimento || "Não preenchido"}</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-[9px] font-bold text-slate-400 uppercase">Cargo do Gestor</p>
-                          <p className="text-xs text-slate-600 truncate">{selectedIA.cargo}</p>
+                          <p className="text-xs text-slate-600 truncate">{selectedIA.cargo || "Não preenchido"}</p>
                         </div>
                         <div>
                           <p className="text-[9px] font-bold text-slate-400 uppercase">Versão Homologada</p>
@@ -505,7 +505,7 @@ export default function SectorMap({ records, profiles }: SectorMapProps) {
                         <div>
                           <p className="text-[9px] font-bold text-slate-400 uppercase">Descrição da Atividade</p>
                           <p className="text-xs text-slate-650 leading-relaxed text-slate-600">
-                            {selectedIA.descricaoAtividade || "Nenhuma descrição informada."}
+                            {selectedIA.descricaoAtividade || "Não preenchido"}
                           </p>
                         </div>
                         <div>
@@ -518,7 +518,7 @@ export default function SectorMap({ records, profiles }: SectorMapProps) {
                                 </span>
                               ))
                             ) : (
-                              <span className="text-[10px] text-slate-400 italic">Nenhum mapeado</span>
+                              <span className="text-[10px] text-slate-400 italic">Não preenchido</span>
                             )}
                           </div>
                         </div>
@@ -531,7 +531,7 @@ export default function SectorMap({ records, profiles }: SectorMapProps) {
                         </div>
                         <div>
                           <span className="text-slate-400 font-medium font-sans">Validação humana:</span>
-                          <p className="font-bold text-slate-700 truncate">{selectedIA.validacaoHumana || "Não especificado"}</p>
+                          <p className="font-bold text-slate-700 truncate">{selectedIA.validacaoHumana || "Não preenchido"}</p>
                         </div>
                       </div>
                     </div>
