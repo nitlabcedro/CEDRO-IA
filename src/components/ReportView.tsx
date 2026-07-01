@@ -536,7 +536,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
 
   // Dynamic approval workflow helpers
   const workflow = workflows?.find(w => w.iaRecordId === record.id);
-  const isWfFinished = !!(workflow && (workflow.finalStatus === "aprovado" || workflow.finalStatus === "negado"));
+  const isWfFinished = !!(workflow && (workflow.finalStatus === "aprovado" || workflow.finalStatus === "negado" || workflow.finalStatus === "cancelado")) || record.statusUso === StatusUso.CANCELADA;
   const currentStepNum = workflow ? workflow.currentStep : 1;
   const deniedSteps = workflow?.steps?.filter(s => s.status === "negado") || [];
 
@@ -958,9 +958,9 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
       {/* RESUMO PRINCIPAL */}
       {(() => {
         const summaryItems = [
-          { label: "Setor", value: record.unidadeSetor || "Não informado" },
-          { label: "Fornecedor", value: record.fornecedor || "Não informado" },
-          { label: "Responsável", value: record.responsavelPreenchimento || "Não informado" }
+          { label: "Setor", value: record.unidadeSetor || "Não preenchido" },
+          { label: "Fornecedor", value: record.fornecedor || "Não preenchido" },
+          { label: "Responsável", value: record.responsavelPreenchimento || "Não preenchido" }
         ].filter(item => !(item.label === "Fornecedor" && item.value.toLowerCase() === "interno"));
 
         return (
@@ -1061,7 +1061,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
               color: "#334155",
               fontWeight: 600
             }}>
-              {record.descricaoAtividade || "Não informado."}
+              {record.descricaoAtividade || "Não preenchido"}
             </div>
           </div>
 
@@ -1086,7 +1086,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
               color: "#334155",
               fontWeight: 700
             }}>
-              {record.objetivos?.join(", ") || "Não informado."}
+              {record.objetivos?.join(", ") || "Não preenchido"}
             </div>
           </div>
         </div>
@@ -1103,7 +1103,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
           </p>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {(record.tipoIA && record.tipoIA.length > 0 ? record.tipoIA : ["Não informado"]).map((tipo, index) => (
+            {(record.tipoIA && record.tipoIA.length > 0 ? record.tipoIA : ["Não preenchido"]).map((tipo, index) => (
               <span
                 key={index}
                 style={{
@@ -1254,10 +1254,10 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                 Supervisão humana
               </p>
               <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: record.validacaoHumana === "Sim" ? "#075618" : "#B42318", fontWeight: 900, textTransform: "uppercase" }}>
-                {record.validacaoHumana === "Sim" ? "Operação assistida" : "Não informada"}
+                {record.validacaoHumana === "Sim" ? "Operação assistida" : "Não preenchido"}
               </p>
               <p style={{ margin: "5px 0 0 0", fontSize: "8.5px", color: "#64748B", fontWeight: 700 }}>
-                {record.quemValida || "Responsável não informado"}
+                {record.quemValida || "Não preenchido"}
               </p>
             </div>
 
@@ -1811,12 +1811,12 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                 <div className="space-y-3.5 text-xs">
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 uppercase">Nome da Ferramenta</span>
-                    <p className="font-extrabold text-[#1F2933] text-sm uppercase">{record.nomeFerramenta || "Não informado"}</p>
+                    <p className="font-extrabold text-[#1F2933] text-sm uppercase">{record.nomeFerramenta || "Não preenchido"}</p>
                   </div>
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 uppercase">Descrição da Atividade</span>
                     <p className="font-semibold text-slate-650 leading-relaxed text-[12.5px]">
-                      {record.descricaoAtividade || "Não informada"}
+                      {record.descricaoAtividade || "Não preenchido"}
                     </p>
                   </div>
                   <div>
@@ -1829,7 +1829,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                           </span>
                         ))
                       ) : (
-                        <span className="text-slate-400 italic font-semibold">Não informado</span>
+                        <span className="text-slate-400 italic font-semibold">Não preenchido</span>
                       )}
                     </div>
                   </div>
@@ -1851,16 +1851,16 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                 <div className="space-y-3.5 text-xs font-semibold">
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 uppercase">Setor Requisitante</span>
-                    <p className="font-extrabold text-[#003F1D] text-sm uppercase">{record.unidadeSetor || "Não informado"}</p>
+                    <p className="font-extrabold text-[#003F1D] text-sm uppercase">{record.unidadeSetor || "Não preenchido"}</p>
                   </div>
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 uppercase">Responsável Técnico</span>
-                    <p className="font-extrabold text-[#1F2933] uppercase">{record.responsavelPreenchimento || "Não informado"}</p>
-                    <p className="text-[10px] text-[#667085] mt-0.5">{record.cargo || "Função não especificada"}</p>
+                    <p className="font-extrabold text-[#1F2933] uppercase">{record.responsavelPreenchimento || "Não preenchido"}</p>
+                    <p className="text-[10px] text-[#667085] mt-0.5">{record.cargo || "Não preenchido"}</p>
                   </div>
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 uppercase block">Data de Cadastro</span>
-                    <p className="font-extrabold text-slate-800 uppercase">{record.dataRegistro || "Não informada"}</p>
+                    <p className="font-extrabold text-slate-800 uppercase">{record.dataRegistro || "Não preenchido"}</p>
                   </div>
                 </div>
               </div>
@@ -1910,7 +1910,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                 <div>
                   <span className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Observações Gerais</span>
                   <p className="font-semibold text-slate-650 leading-relaxed italic bg-white p-3 rounded-xl border border-slate-150">
-                    {record.observacoesGerais && record.observacoesGerais.trim() !== "" ? `"${record.observacoesGerais}"` : "Nenhuma observação geral registrada."}
+                    {record.observacoesGerais && record.observacoesGerais.trim() !== "" ? `"${record.observacoesGerais}"` : "Não preenchido"}
                   </p>
                 </div>
                 <div>
@@ -1920,8 +1920,12 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                       <p className="font-semibold text-slate-650 leading-relaxed bg-white p-3 rounded-xl border border-slate-150">
                         {record.anexos}
                       </p>
-                    ) : null}
-                    {record.documentoNome ? (
+                    ) : (
+                      <p className="font-semibold text-slate-400 italic bg-slate-50/55 p-3 rounded-xl border border-slate-150">
+                        Não preenchido
+                      </p>
+                    )}
+                    {record.documentoNome && (
                       <div className="flex items-center justify-between bg-emerald-50/50 border border-[#075618]/20 p-3.5 rounded-xl shadow-3xs">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-xl shrink-0">📎</span>
@@ -1946,10 +1950,6 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                           </a>
                         )}
                       </div>
-                    ) : (
-                      <p className="font-semibold text-slate-400 italic bg-slate-50/55 p-3 rounded-xl border border-slate-150">
-                        Nenhum arquivo físico anexado.
-                      </p>
                     )}
                   </div>
                 </div>
@@ -1988,7 +1988,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                         </div>
                       ))
                     ) : (
-                      <span className="text-xs text-slate-400 italic">Nenhum</span>
+                      <span className="text-xs text-slate-400 italic">Não preenchido</span>
                     )}
                   </div>
                 </div>
@@ -1999,7 +1999,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                 <div className="bg-[#075618]/5 border border-emerald-100/60 p-6 rounded-2xl">
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-[#075618] mb-2">Benefícios</h4>
                   <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold italic">
-                    "{record.beneficiosEsperados || "Nenhum benefício foi autodeclarado."}"
+                    "{record.beneficiosEsperados || "Não preenchido"}"
                   </p>
                 </div>
 
@@ -2050,7 +2050,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                 <div className="bg-slate-50 border border-slate-200/60 p-6 rounded-2xl">
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-[#075618] mb-3">Dados Utilizados Ativamente</h4>
                   <p className="text-sm font-extrabold text-[#111111] leading-relaxed select-all">
-                    {record.quaisDados || "Nenhum mapeamento de dados registrado."}
+                    {record.quaisDados || "Não preenchido"}
                   </p>
                 </div>
 
@@ -2097,14 +2097,14 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                   <span className={`px-2.5 py-1 text-[9px] font-extrabold rounded uppercase tracking-tight ${
                     record.dadosAnonimizados === "Sim" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
                   }`}>
-                    {record.dadosAnonimizados || "Não informado"}
+                    {record.dadosAnonimizados || "Não preenchido"}
                   </span>
                 </div>
 
                 <div className="space-y-1">
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight block">Instruções de Proteção</span>
                   <p className="text-xs text-slate-500 bg-white p-3 rounded-xl border border-slate-200/50 italic leading-relaxed">
-                    {record.obsProtecaoDados || "Nenhuma instrução específica informada."}
+                    {record.obsProtecaoDados || "Não preenchido"}
                   </p>
                 </div>
               </div>
@@ -2151,7 +2151,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-400 italic">Nenhum risco de segurança cadastrado.</p>
+                      <p className="text-xs text-slate-400 italic">Não preenchido</p>
                     )}
                   </div>
                 </div>
@@ -2189,7 +2189,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-400 italic">Nenhum controle ativo mapeado.</p>
+                      <p className="text-xs text-slate-400 italic">Não preenchido</p>
                     )}
                   </div>
                 </div>
@@ -2197,7 +2197,7 @@ export default function ReportView({ record, onBack, onEdit, isAdmin, workflows,
                 <div className="bg-slate-50 border border-slate-205/60 p-5 rounded-2xl">
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight block mb-1">Medidas Operacionais Coletadas</span>
                   <p className="text-xs text-slate-500 bg-white p-3 rounded-xl border border-slate-200/50 italic leading-relaxed">
-                    {record.obsRiscosControles || "Nenhuma observação operacional registrada."}
+                    {record.obsRiscosControles || "Não preenchido"}
                   </p>
                 </div>
               </div>
