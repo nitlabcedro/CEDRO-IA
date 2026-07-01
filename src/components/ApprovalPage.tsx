@@ -22,7 +22,7 @@ interface ApprovalPageProps {
 }
 
 const getOriginalObservacoes = (record: IARecord | null | undefined): string => {
-  if (!record) return "Não informado pelo solicitante.";
+  if (!record) return "Não preenchido";
   
   if (record.observacoesGeraisOriginais && record.observacoesGeraisOriginais.trim() !== "") {
     return record.observacoesGeraisOriginais;
@@ -30,7 +30,7 @@ const getOriginalObservacoes = (record: IARecord | null | undefined): string => 
   
   const currentObs = record.observacoesGerais;
   if (!currentObs || currentObs.trim() === "") {
-    return "Não informado pelo solicitante.";
+    return "Não preenchido";
   }
 
   const trimmed = currentObs.trim();
@@ -45,7 +45,7 @@ const getOriginalObservacoes = (record: IARecord | null | undefined): string => 
     trimmed.includes("Parecer:");
 
   if (isDecision) {
-    return "Não informado pelo solicitante.";
+    return "Não preenchido";
   }
 
   return currentObs;
@@ -317,7 +317,7 @@ export default function ApprovalPage({
   };
 
   const filteredRecords = useMemo(() => {
-    let list = records;
+    let list = records.filter(r => r.statusUso !== StatusUso.CANCELADA);
 
     // Se o usuário logado pertence à etapa 5 ou 6 do fluxo, ele SÓ pode ver as IAs que estão aguardando estritamente a sua aprovação
     if (isStep5Or6User) {
@@ -326,7 +326,7 @@ export default function ApprovalPage({
         if (!isPending) return false;
 
         const wf = getRecordWf(r.id);
-        const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado");
+        const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado" || wf.finalStatus === "cancelado");
         if (isWfFinished) return false;
 
         const currentStepNum = wf ? wf.currentStep : 1;
@@ -353,11 +353,11 @@ export default function ApprovalPage({
       const stageName = stepDef?.roleName || "";
 
       const matchesSearch = 
-        r.nomeFerramenta.toLowerCase().includes(term) || 
-        r.unidadeSetor.toLowerCase().includes(term) ||
-        r.id.toLowerCase().includes(term) ||
-        (r.responsavelPreenchimento && r.responsavelPreenchimento.toLowerCase().includes(term)) ||
-        stageName.toLowerCase().includes(term);
+         r.nomeFerramenta.toLowerCase().includes(term) || 
+         r.unidadeSetor.toLowerCase().includes(term) ||
+         r.id.toLowerCase().includes(term) ||
+         (r.responsavelPreenchimento && r.responsavelPreenchimento.toLowerCase().includes(term)) ||
+         stageName.toLowerCase().includes(term);
 
       return matchesSearch;
     });
@@ -372,7 +372,7 @@ export default function ApprovalPage({
           if (!isPending) return false;
 
           const wf = getRecordWf(r.id);
-          const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado");
+          const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado" || wf.finalStatus === "cancelado");
           if (isWfFinished) return false;
 
           const currentStepNum = wf ? wf.currentStep : 1;
@@ -399,13 +399,14 @@ export default function ApprovalPage({
 
   const stats = useMemo(() => {
     const total = records.length;
+    const activeRecords = records.filter(r => r.statusUso !== StatusUso.CANCELADA);
     
     // IAs sob responsabilidade direta do logado
-    const myTurnCount = records.filter(r => {
+    const myTurnCount = activeRecords.filter(r => {
       const isPending = (r.statusAuditoria || StatusAuditoria.PENDENTE) === StatusAuditoria.PENDENTE;
       if (!isPending) return false;
       const wf = workflows.find(w => w.iaRecordId === r.id);
-      const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado");
+      const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado" || wf.finalStatus === "cancelado");
       if (isWfFinished) return false;
 
       const currentStepNum = wf ? wf.currentStep : 1;
@@ -427,7 +428,7 @@ export default function ApprovalPage({
 
     const totalPending = isStep5Or6User 
       ? myTurnCount 
-      : records.filter(r => (r.statusAuditoria || StatusAuditoria.PENDENTE) === StatusAuditoria.PENDENTE).length;
+      : activeRecords.filter(r => (r.statusAuditoria || StatusAuditoria.PENDENTE) === StatusAuditoria.PENDENTE).length;
 
     return { total, myTurnCount, totalPending };
   }, [records, workflows, currentSteps, currentUserId, profiles, isAdmin, isStep5Or6User]);
@@ -518,7 +519,7 @@ export default function ApprovalPage({
 
                 const isStepUnassigned = !stepUserId;
                 const isAssignedToMe = stepUserId === currentUserId;
-                const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado");
+                const isWfFinished = (wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado" || wf.finalStatus === "cancelado")) || record.statusUso === StatusUso.CANCELADA;
                 const isMyTurn = !isWfFinished && isAssignedToMe && record.statusAuditoria === StatusAuditoria.PENDENTE;
 
                 const dateStr = record.createdAt ? record.createdAt.slice(0, 10) : "";
@@ -768,7 +769,7 @@ export default function ApprovalPage({
 
                           const isStepUnassigned = !stepUserId;
                           const isAssignedToMe = stepUserId === currentUserId;
-                          const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado");
+                          const isWfFinished = (wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado" || wf.finalStatus === "cancelado")) || record.statusUso === StatusUso.CANCELADA;
                           const isMyTurn = !isWfFinished && isAssignedToMe && record.statusAuditoria === StatusAuditoria.PENDENTE;
 
                           return (
@@ -833,7 +834,7 @@ export default function ApprovalPage({
 
                       const isStepUnassigned = !stepUserId;
                       const isAssignedToMe = stepUserId === currentUserId;
-                      const isWfFinished = wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado");
+                      const isWfFinished = (wf && (wf.finalStatus === "aprovado" || wf.finalStatus === "negado" || wf.finalStatus === "cancelado")) || record.statusUso === StatusUso.CANCELADA;
                       const isMyTurn = !isWfFinished && isAssignedToMe && record.statusAuditoria === StatusAuditoria.PENDENTE;
 
                       const latestDecision = record.historico?.find(
@@ -1504,7 +1505,7 @@ export default function ApprovalPage({
                                 <div>
                                   <p className="text-[9px] text-slate-900 uppercase font-black tracking-wider mb-1">Descrição da Atividade</p>
                                   <p className="bg-[#FAFAFA] p-3 rounded-xl border border-[#E8E7E7] italic mt-1 font-medium leading-relaxed text-slate-650">
-                                    {record.descricaoAtividade ? `"${record.descricaoAtividade}"` : <span className="text-slate-400 italic">Não informado</span>}
+                                    {record.descricaoAtividade ? `"${record.descricaoAtividade}"` : <span className="text-slate-400 italic">Não preenchido</span>}
                                   </p>
                                 </div>
                                 <div className="pt-2 border-t border-[#E8E7E7]">
@@ -1522,7 +1523,7 @@ export default function ApprovalPage({
                                 <div className="pt-2 border-t border-[#E8E7E7]">
                                   <p className="text-[9px] text-slate-900 uppercase font-black tracking-wider mb-1">Benefícios Esperados</p>
                                   <p className="bg-[#FAFAFA] p-3 rounded-xl border border-[#E8E7E7] italic mt-1 font-medium leading-relaxed text-slate-650">
-                                    {record.beneficiosEsperados ? `"${record.beneficiosEsperados}"` : <span className="text-slate-400 italic">Não informado</span>}
+                                    {record.beneficiosEsperados ? `"${record.beneficiosEsperados}"` : <span className="text-slate-400 italic">Não preenchido</span>}
                                   </p>
                                 </div>
                               </div>
@@ -1554,8 +1555,8 @@ export default function ApprovalPage({
                                 <div>
                                   <p className="text-[9px] text-slate-900 uppercase font-black tracking-wider mb-1">Observações Gerais do Solicitante</p>
                                   <p className="bg-[#FAFAFA] p-3.5 rounded-xl border border-[#E8E7E7] italic mt-1 font-medium leading-relaxed text-slate-650">
-                                    {getOriginalObservacoes(record) === "Não informado pelo solicitante." ? (
-                                      <span className="text-slate-400 italic">Não informado pelo solicitante.</span>
+                                    {getOriginalObservacoes(record) === "Não preenchido" ? (
+                                      <span className="text-slate-400 italic">Não preenchido</span>
                                     ) : (
                                       `"${getOriginalObservacoes(record)}"`
                                     )}
@@ -2663,7 +2664,7 @@ export default function ApprovalPage({
                           <div>
                             <p className="font-noto text-[10px] font-black uppercase tracking-wide text-slate-400">Descrição da Atividade</p>
                             <p className="mt-1 font-noto text-sm font-bold text-[#111111] italic bg-[#FAFAFA] p-3 rounded-xl border border-[#E8E7E7] leading-relaxed">
-                              {record.descricaoAtividade ? `"${record.descricaoAtividade}"` : <span className="text-slate-400 italic">Não informado</span>}
+                              {record.descricaoAtividade ? `"${record.descricaoAtividade}"` : <span className="text-slate-400 italic">Não preenchido</span>}
                             </p>
                           </div>
                           <div className="pt-2 border-t border-[#E8E7E7]">
@@ -2681,7 +2682,7 @@ export default function ApprovalPage({
                           <div className="pt-2 border-t border-[#E8E7E7]">
                             <p className="font-noto text-[10px] font-black uppercase tracking-wide text-slate-400">Benefícios Esperados</p>
                             <p className="mt-1 font-noto text-sm font-bold text-[#111111] italic bg-[#FAFAFA] p-3 rounded-xl border border-[#E8E7E7] leading-relaxed">
-                              {record.beneficiosEsperados ? `"${record.beneficiosEsperados}"` : <span className="text-slate-400 italic">Não informado</span>}
+                              {record.beneficiosEsperados ? `"${record.beneficiosEsperados}"` : <span className="text-slate-400 italic">Não preenchido</span>}
                             </p>
                           </div>
                         </div>
@@ -2706,8 +2707,8 @@ export default function ApprovalPage({
                           <div>
                             <p className="font-noto text-[10px] font-black uppercase tracking-wide text-slate-400">Observações Gerais do Solicitante</p>
                             <p className="mt-1 font-noto text-sm font-bold text-[#111111] italic bg-[#FAFAFA] p-3 rounded-xl border border-[#E8E7E7] leading-relaxed">
-                              {getOriginalObservacoes(record) === "Não informado pelo solicitante." ? (
-                                <span className="text-slate-400 italic">Não informado pelo solicitante.</span>
+                              {getOriginalObservacoes(record) === "Não preenchido" ? (
+                                <span className="text-slate-400 italic">Não preenchido</span>
                               ) : (
                                 `"${getOriginalObservacoes(record)}"`
                               )}
