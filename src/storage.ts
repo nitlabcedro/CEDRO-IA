@@ -100,7 +100,7 @@ export const getRecords = async (userId?: string, isAdmin?: boolean, userSector?
       console.warn("Erro ao limpar localStorage de fallbacks:", e);
     }
 
-    if (userId && !finalIsAdmin) {
+    if (userId && !finalIsAdmin && isValidUUID(userId)) {
       try {
         const { data: prof, error: profErr } = await supabase
           .from('profiles')
@@ -238,10 +238,15 @@ export const getRecords = async (userId?: string, isAdmin?: boolean, userSector?
   }
 };
 
+const isValidUUID = (id: any): boolean => {
+  if (typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 export const addRecord = async (record: IARecord, userId?: string, isAdmin?: boolean) => {
   let finalIsAdmin = isAdmin;
   try {
-    if (userId && !finalIsAdmin) {
+    if (userId && !finalIsAdmin && isValidUUID(userId)) {
       try {
         const { data: prof } = await supabase
           .from('profiles')
@@ -254,12 +259,50 @@ export const addRecord = async (record: IARecord, userId?: string, isAdmin?: boo
       } catch (e) {}
     }
 
-    console.log('☁️ Tentando salvar registro no Supabase:', record.id, { isAdmin: finalIsAdmin });
+    console.log('☁️ Tentando salvar registro no Supabase com resiliência total:', record.id, { isAdmin: finalIsAdmin });
     
     // Determinando o status final: 
     // Pendente, Aprovado ou Negado
     const finalStatus = record.statusAuditoria || (finalIsAdmin ? StatusAuditoria.APROVADO : StatusAuditoria.PENDENTE);
-    const resolvedOwnerId = userId || record.ownerId || (record as any).owner_id || null;
+    
+    // Validar UUID do owner_id para evitar violação de tipo ou restrição de chave estrangeira
+    let resolvedOwnerId: string | null = null;
+    if (userId && isValidUUID(userId)) {
+      resolvedOwnerId = userId;
+    } else {
+      const candidateOwnerId = record.ownerId || (record as any).owner_id;
+      if (candidateOwnerId && isValidUUID(candidateOwnerId)) {
+        resolvedOwnerId = candidateOwnerId;
+      }
+    }
+
+    // Se o profile para o resolvedOwnerId não existe, vamos criar um perfil básico para garantir que a chave estrangeira ia_records_owner_id_fkey não seja violada
+    if (resolvedOwnerId) {
+      try {
+        const { data: profileCheck } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', resolvedOwnerId)
+          .maybeSingle();
+
+        if (!profileCheck) {
+          console.log(`👤 Profile para o owner ${resolvedOwnerId} não existe. Criando perfil básico para evitar violação de chave estrangeira...`);
+          await supabase
+            .from('profiles')
+            .insert({
+              id: resolvedOwnerId,
+              full_name: record.responsavelPreenchimento || 'Membro Cedro',
+              setor: record.unidadeSetor || '',
+              cargo: record.cargo || '',
+              role: 'user',
+              updated_at: new Date().toISOString()
+            });
+        }
+      } catch (profileErr) {
+        console.warn('Erro ao garantir existência do perfil para o owner:', profileErr);
+      }
+    }
+
     const recordWithStatus = { 
       ...record, 
       statusAuditoria: finalStatus,
@@ -272,40 +315,98 @@ export const addRecord = async (record: IARecord, userId?: string, isAdmin?: boo
       updated_at: new Date().toISOString(),
       unidade_setor: record.unidadeSetor || '',
       responsavel_preenchimento: record.responsavelPreenchimento || '',
-      nome_ferramenta: record.nomeFerramenta || ''
+      nome_ferramenta: record.nomeFerramenta || '',
+      status: record.statusAuditoria || finalStatus,
+      status_uso: record.statusUso || 'Em avaliação',
+      owner_id: resolvedOwnerId
     };
 
-    let upsertErr;
-    try {
-      const { error } = await supabase
-        .from('ia_records')
-        .upsert({ 
-          ...payload,
-          owner_id: resolvedOwnerId
-        });
-      upsertErr = error;
-    } catch (e: any) {
-      upsertErr = e;
-    }
+    // Função interna para limpar mensagens de erro e extrair nome da coluna faltante
+    const getMissingColumnName = (message: string): string | null => {
+      let match = message.match(/column "([^"]+)" does not exist/i);
+      if (match) return match[1];
+      
+      match = message.match(/column ([a-zA-Z0-9_-]+) does not exist/i);
+      if (match) return match[1];
 
-    if (upsertErr) {
-      const errMsg = (upsertErr.message || '').toLowerCase();
-      const isMissingColumn = upsertErr.code === 'PGRST204' || upsertErr.code === '42703' || errMsg.includes('owner_id') || errMsg.includes('schema cache');
-      if (isMissingColumn) {
-        console.warn('⚠️ Coluna owner_id não existe no banco. Salvando registro sem essa coluna...', upsertErr);
-        const { error: retryError } = await supabase
+      match = message.match(/could not find the column ([a-zA-Z0-9_-]+)/i);
+      if (match) return match[1];
+
+      return null;
+    };
+
+    let currentPayload = { ...payload };
+    let attempts = 0;
+    const maxAttempts = 12;
+    let lastError: any = null;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        const { error } = await supabase
           .from('ia_records')
-          .upsert(payload);
-        if (retryError) {
-          console.error('❌ Erro no salvamento de fallback (sem owner_id):', retryError);
-          throw retryError;
+          .upsert(currentPayload);
+        
+        if (!error) {
+          console.log(`✅ Registro ${record.id} salvo com sucesso no Supabase na tentativa ${attempts}!`);
+          lastError = null;
+          break;
         }
-      } else {
-        console.error('❌ Erro detalhado do Supabase (com owner_id):', upsertErr);
-        throw upsertErr;
+        
+        lastError = error;
+        const errMsg = error.message || '';
+        const errCode = error.code || '';
+        
+        // Verifica se é erro de coluna inexistente
+        const isMissingColumn = errCode === '42703' || 
+                               errCode === 'PGRST204' || 
+                               errMsg.toLowerCase().includes('column') || 
+                               errMsg.toLowerCase().includes('does not exist');
+        
+        if (isMissingColumn) {
+          const missingCol = getMissingColumnName(errMsg);
+          if (missingCol && missingCol in currentPayload) {
+            console.warn(`⚠️ Coluna [${missingCol}] inexistente no banco. Removendo do payload de upsert e tentando novamente...`);
+            delete currentPayload[missingCol];
+            continue; // Tenta novamente com o payload limpo
+          } else {
+            // Se não conseguimos extrair o nome da coluna mas o erro diz que alguma coluna não existe,
+            // podemos tentar remover colunas opcionais conhecidas uma a uma na ordem inversa de importância
+            const fallbackRemovals = ['owner_id', 'status_uso', 'status', 'unidade_setor', 'responsavel_preenchimento', 'nome_ferramenta', 'updated_at'];
+            let removedSomething = false;
+            for (const col of fallbackRemovals) {
+              if (col in currentPayload) {
+                console.warn(`⚠️ Erro de coluna não identificada. Tentando remover fallback [${col}] do payload de upsert...`);
+                delete currentPayload[col];
+                removedSomething = true;
+                break; // Remove uma e tenta de novo
+              }
+            }
+            if (removedSomething) {
+              continue;
+            }
+          }
+        }
+        
+        // Se for outro tipo de erro (ex: violação de chave estrangeira com profiles), vamos tratar de forma robusta:
+        if (errMsg.toLowerCase().includes('violates foreign key constraint') && errMsg.toLowerCase().includes('owner_id')) {
+          console.warn('⚠️ Violação de chave estrangeira em owner_id. Removendo owner_id do payload e tentando novamente...');
+          delete currentPayload['owner_id'];
+          continue;
+        }
+
+        // Se o erro for outro que não conseguimos tratar, paramos o loop e lançamos
+        break;
+      } catch (e: any) {
+        lastError = e;
+        break;
       }
     }
-    console.log('✅ Registro salvo com sucesso no Supabase!');
+
+    if (lastError) {
+      console.error('❌ Erro definitivo ao salvar no Supabase:', lastError);
+      throw lastError;
+    }
   } catch (error: any) {
     console.error('Error adding to Supabase:', error);
     throw error; 
@@ -317,7 +418,17 @@ export const addRecord = async (record: IARecord, userId?: string, isAdmin?: boo
     const records: IARecord[] = localData ? JSON.parse(localData) : [];
     const index = records.findIndex(r => r.id === record.id);
     const finalStatus = record.statusAuditoria || (finalIsAdmin ? StatusAuditoria.APROVADO : StatusAuditoria.PENDENTE);
-    const resolvedOwnerId = userId || record.ownerId || (record as any).owner_id || null;
+    
+    let resolvedOwnerId: string | null = null;
+    if (userId && isValidUUID(userId)) {
+      resolvedOwnerId = userId;
+    } else {
+      const candidateOwnerId = record.ownerId || (record as any).owner_id;
+      if (candidateOwnerId && isValidUUID(candidateOwnerId)) {
+        resolvedOwnerId = candidateOwnerId;
+      }
+    }
+
     const recordWithStatus = { 
       ...record, 
       statusAuditoria: finalStatus,
