@@ -21,7 +21,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   ]);
   const [cargosPorSetor, setCargosPorSetor] = useState<Record<string, string[]>>({});
   const [sectors, setSectors] = useState<string[]>([]);
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -97,6 +97,25 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     const cleanPassword = password.trim();
 
     try {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: "https://ia.labcedro.app/reset-password",
+        });
+        if (error) {
+          setMessage({
+            type: "error",
+            text: "Não foi possível enviar o link de recuperação. Verifique o e-mail informado ou tente novamente."
+          });
+        } else {
+          setMessage({
+            type: "success",
+            text: "Enviamos um link de recuperação para o e-mail informado. Verifique sua caixa de entrada e spam."
+          });
+        }
+        setLoading(false);
+        return;
+      }
+
       if (mode === "login") {
         const { data: authData, error } = await supabase.auth.signInWithPassword({ 
           email: cleanEmail, 
@@ -364,15 +383,12 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           
           {/* Header Title */}
           <div className="mb-6 relative">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-8 bg-gradient-to-b from-[#075618] to-[#F29222] rounded-full" />
-              <h2 className="text-2xl lg:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#075618] via-[#0b631d] to-[#F29222]/90 tracking-tight font-display">
-                {mode === "login" ? "Login" : "Cadastro"}
-              </h2>
-            </div>
-            {mode === "signup" && (
-              <p className="text-slate-500 text-xs lg:text-[13px] mt-2 ml-4.5 font-medium">
-                Crie uma conta para acessar a plataforma
+            <h2 className="text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#075618] via-[#094d15] to-[#F29222] tracking-tight font-display">
+              {mode === "login" ? "Login" : mode === "signup" ? "Cadastro" : "Recuperar Senha"}
+            </h2>
+            {mode === "forgot" && (
+              <p className="text-slate-500 text-xs lg:text-[13px] mt-2 font-medium">
+                Informe seu e-mail para receber as instruções de recuperação.
               </p>
             )}
           </div>
@@ -403,14 +419,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   </div>
                   
                   {/* Combos Setor + Cargo */}
-                  <div className="space-y-3 pt-2">
-                    <label className="text-xs font-extrabold text-slate-700 uppercase tracking-tight ml-1 block">
-                      Atribuições no Laboratório Cedro
-                    </label>
-                    <p className="text-[11px] text-slate-500 font-medium ml-1 -mt-2">
-                      Adicione todos os seus setores e cargos de atuação.
-                    </p>
-                    
+                  <div className="space-y-3 pt-1">
                     {combos.map((combo, index) => (
                       <div key={index} className="p-4 bg-slate-100/40 border border-slate-300/80 rounded-2xl space-y-3 relative">
                         <div className="flex justify-between items-center">
@@ -503,7 +512,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               </div>
               <input
                 type="email"
-                placeholder={mode === "signup" ? "seuemail@labcedro.com.br" : "Usuário"}
+                placeholder={mode === "signup" ? "seuemail@labcedro.com.br" : mode === "forgot" ? "E-mail" : "Usuário"}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -517,26 +526,28 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             )}
 
             {/* Password Input */}
-            <div className="relative group flex items-center bg-slate-100/50 hover:bg-slate-100/80 focus-within:bg-white border border-slate-300/90 focus-within:border-[#075618] rounded-2xl transition-all duration-300 focus-within:ring-4 focus-within:ring-[#075618]/5 shadow-[0_2px_10px_rgba(0,0,0,0.04)] focus-within:shadow-md">
-              <div className="absolute left-4.5 flex items-center justify-center text-slate-500/90 group-focus-within:text-[#075618] group-hover:text-slate-600 transition-colors duration-200">
-                <Lock size={20} strokeWidth={1.75} />
+            {mode !== "forgot" && (
+              <div className="relative group flex items-center bg-slate-100/50 hover:bg-slate-100/80 focus-within:bg-white border border-slate-300/90 focus-within:border-[#075618] rounded-2xl transition-all duration-300 focus-within:ring-4 focus-within:ring-[#075618]/5 shadow-[0_2px_10px_rgba(0,0,0,0.04)] focus-within:shadow-md">
+                <div className="absolute left-4.5 flex items-center justify-center text-slate-500/90 group-focus-within:text-[#075618] group-hover:text-slate-600 transition-colors duration-200">
+                  <Lock size={20} strokeWidth={1.75} />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Senha"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-13 pr-12 py-4 bg-transparent text-slate-900 outline-none text-base placeholder:text-slate-500 font-medium tracking-wide caret-[#075618]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4.5 flex items-center justify-center text-slate-500 hover:text-slate-700 focus:outline-none transition-colors duration-200"
+                >
+                  {showPassword ? <EyeOff size={20} strokeWidth={1.75} /> : <Eye size={20} strokeWidth={1.75} />}
+                </button>
               </div>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Senha"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-13 pr-12 py-4 bg-transparent text-slate-900 outline-none text-base placeholder:text-slate-500 font-medium tracking-wide caret-[#075618]"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4.5 flex items-center justify-center text-slate-500 hover:text-slate-700 focus:outline-none transition-colors duration-200"
-              >
-                {showPassword ? <EyeOff size={20} strokeWidth={1.75} /> : <Eye size={20} strokeWidth={1.75} />}
-              </button>
-            </div>
+            )}
 
             {/* Checkbox for Lembrar-me */}
             {mode === "login" && (
@@ -550,6 +561,13 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   />
                   <span className="group-hover:text-slate-900 transition-colors">Lembrar-me</span>
                 </label>
+                <button
+                  type="button"
+                  onClick={() => { setMode("forgot"); setMessage(null); }}
+                  className="text-slate-600 text-xs hover:text-[#075618] hover:underline transition-colors cursor-pointer font-semibold"
+                >
+                  Esqueci minha senha
+                </button>
               </div>
             )}
 
@@ -574,28 +592,40 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               {loading ? (
                 <Loader2 className="animate-spin" size={16} />
               ) : (
-                mode === "login" ? "Login" : "Cadastrar"
+                mode === "login" ? "Login" : mode === "signup" ? "Cadastrar" : "Enviar link de recuperação"
               )}
             </button>
+
+            {mode === "forgot" && (
+              <button
+                type="button"
+                onClick={() => { setMode("login"); setMessage(null); }}
+                className="w-full py-3.5 bg-slate-100 hover:bg-slate-200/80 active:scale-[0.99] text-slate-700 font-bold rounded-xl transition-all flex items-center justify-center text-sm cursor-pointer shadow-sm focus:outline-none focus:ring-4 focus:ring-slate-200"
+              >
+                Cancelar
+              </button>
+            )}
           </form>
 
           {/* Switch mode */}
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMessage(null); }}
-              className="text-slate-600 text-xs hover:text-[#075618] hover:underline transition-colors cursor-pointer"
-            >
-              {mode === "login" ? "Ainda não tem acesso? Cadastre-se" : "Já possui uma conta? Faça Login"}
-            </button>
-          </div>
+          {mode !== "forgot" && (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMessage(null); }}
+                className="text-slate-600 text-xs hover:text-[#075618] hover:underline transition-colors cursor-pointer"
+              >
+                {mode === "login" ? "Ainda não tem acesso? Cadastre-se" : "Já possui uma conta? Faça Login"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer actions / Support link */}
         <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col items-center relative z-10">
           <button
             type="button"
-            onClick={() => setMessage({ type: "success", text: "Entre em contato com o suporte técnico no NIT para redefinir sua senha." })}
+            onClick={() => { setMode("forgot"); setMessage(null); }}
             className="text-slate-500 text-[12px] hover:text-[#075618] hover:underline transition-colors bg-transparent border-0 outline-none cursor-pointer"
           >
             Esqueci minha senha
