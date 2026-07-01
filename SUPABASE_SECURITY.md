@@ -170,3 +170,129 @@ As chaves do Supabase (`VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`) expostas 
 
 - Nunca use a chave `service_role` (que ignora o RLS) em ambientes cliente/frontend.
 - Mantenha sempre a `GEMINI_API_KEY` rodando exclusivamente do lado do servidor (sem prefixo `VITE_` e hospedada em variáveis de ambiente da nuvem/Netlify).
+
+---
+
+## 6. Tabelas de Workflow de Aprovação — POLÍTICAS SEGURAS
+
+As tabelas de workflow regulam o fluxo de aprovação das IAs e também devem ser protegidas adequadamente usando políticas baseadas em funções e propriedade dos registros.
+
+### A. Tabela `approval_config` (Configurações Globais das Etapas)
+As configurações devem ser consultadas por qualquer usuário autenticado, mas modificadas apenas por administradores.
+
+```sql
+ALTER TABLE public.approval_config ENABLE ROW LEVEL SECURITY;
+
+-- 1. Qualquer usuário autenticado pode ler a configuração de etapas
+CREATE POLICY "Leitura de configuração de aprovação por autentitados"
+ON public.approval_config FOR SELECT
+TO authenticated
+USING (true);
+
+-- 2. Apenas administradores podem inserir, atualizar ou excluir configurações
+CREATE POLICY "Gerenciamento de configuração exclusivo para administradores"
+ON public.approval_config FOR ALL
+TO authenticated
+USING (public.get_auth_role() = 'admin')
+WITH CHECK (public.get_auth_role() = 'admin');
+```
+
+### B. Tabela `approval_workflows` (Fluxos de Aprovação Ativos)
+Os fluxos podem ser lidos por qualquer pessoa autenticada. Atualizações de status (como aprovar, rejeitar ou cancelar) são permitidas para administradores, moderadores e para o solicitante da IA correspondente.
+
+```sql
+ALTER TABLE public.approval_workflows ENABLE ROW LEVEL SECURITY;
+
+-- 1. Leitura por qualquer usuário autenticado
+CREATE POLICY "Leitura de fluxos de aprovação por autenticados"
+ON public.approval_workflows FOR SELECT
+TO authenticated
+USING (true);
+
+-- 2. Criação por administradores, moderadores ou pelo criador da IA
+CREATE POLICY "Criação de fluxos de aprovação controlada"
+ON public.approval_workflows FOR INSERT
+TO authenticated
+WITH CHECK (
+  public.get_auth_role() = 'admin'
+  OR public.get_auth_role() = 'moderator'
+  OR EXISTS (
+    SELECT 1 FROM public.ia_records 
+    WHERE public.ia_records.id = ia_record_id 
+    AND public.ia_records.owner_id = auth.uid()
+  )
+);
+
+-- 3. Atualização por admins, moderadores ou pelo criador da IA (para cancelamento)
+CREATE POLICY "Atualização de fluxos de aprovação controlada"
+ON public.approval_workflows FOR UPDATE
+TO authenticated
+USING (
+  public.get_auth_role() = 'admin'
+  OR public.get_auth_role() = 'moderator'
+  OR EXISTS (
+    SELECT 1 FROM public.ia_records 
+    WHERE public.ia_records.id = ia_record_id 
+    AND public.ia_records.owner_id = auth.uid()
+  )
+)
+WITH CHECK (
+  public.get_auth_role() = 'admin'
+  OR public.get_auth_role() = 'moderator'
+  OR EXISTS (
+    SELECT 1 FROM public.ia_records 
+    WHERE public.ia_records.id = ia_record_id 
+    AND public.ia_records.owner_id = auth.uid()
+  )
+);
+
+-- 4. Exclusão restrita a administradores
+CREATE POLICY "Exclusão de fluxos restrita a admins"
+ON public.approval_workflows FOR DELETE
+TO authenticated
+USING (public.get_auth_role() = 'admin');
+```
+
+### C. Tabela `approval_steps` (Histórico de Pareceres de cada Etapa)
+As etapas devem poder ser visualizadas por todos os autenticados, mas preenchidas apenas por administradores ou pelos responsáveis designados de cada etapa.
+
+```sql
+ALTER TABLE public.approval_steps ENABLE ROW LEVEL SECURITY;
+
+-- 1. Leitura por qualquer usuário autenticado
+CREATE POLICY "Leitura de etapas de aprovação por autenticados"
+ON public.approval_steps FOR SELECT
+TO authenticated
+USING (true);
+
+-- 2. Criação de etapas por admins ou moderadores
+CREATE POLICY "Criação de etapas controlada"
+ON public.approval_steps FOR INSERT
+TO authenticated
+WITH CHECK (
+  public.get_auth_role() = 'admin'
+  OR public.get_auth_role() = 'moderator'
+);
+
+-- 3. Atualização de etapas pelo responsável designado, admin ou moderador
+CREATE POLICY "Preenchimento de pareceres pelo responsável"
+ON public.approval_steps FOR UPDATE
+TO authenticated
+USING (
+  public.get_auth_role() = 'admin'
+  OR public.get_auth_role() = 'moderator'
+  -- Permitir se for o responsável atribuído àquela etapa específica
+  OR assigned_user_id = auth.uid()
+)
+WITH CHECK (
+  public.get_auth_role() = 'admin'
+  OR public.get_auth_role() = 'moderator'
+  OR assigned_user_id = auth.uid()
+);
+
+-- 4. Exclusão restrita a administradores
+CREATE POLICY "Exclusão de etapas restrita a admins"
+ON public.approval_steps FOR DELETE
+TO authenticated
+USING (public.get_auth_role() = 'admin');
+```
